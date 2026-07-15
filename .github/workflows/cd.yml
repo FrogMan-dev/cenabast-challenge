@@ -22,16 +22,22 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Listar repositorios existentes en Artifact Registry
+        run: |
+          gcloud artifacts repositories list \
+            --project=$PROJECT_ID \
+            --location=$REGION || echo "No se pudo listar (posible falta de permiso de lectura tambien)"
+
       - name: Configurar Docker para Artifact Registry
         run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-      - name: Crear repositorio en Artifact Registry (si no existe)
+      - name: Crear repositorio en Artifact Registry
         run: |
           gcloud artifacts repositories create $REPO \
             --repository-format=docker \
             --location=$REGION \
             --project=$PROJECT_ID \
-            --quiet || echo "El repositorio ya existe o no hay permiso para crearlo, se continua."
+            --quiet
 
       - name: Build de la imagen Docker
         run: |
@@ -41,7 +47,7 @@ jobs:
         run: |
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }}
 
-      - name: Deploy a Cloud Run (usando imagen ya construida, sin Cloud Build)
+      - name: Deploy a Cloud Run
         run: |
           gcloud run deploy $SERVICE_NAME \
             --image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} \
