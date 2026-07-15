@@ -1,16 +1,15 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY requirements.txt .
+COPY requirements.txt requirements-dev.txt requirements-test.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
-# Expose port 8080 (required by Cloud Run)
-EXPOSE 8080
+# Entrenamiento en build-time: genera challenge/artifacts/model.pkl
+# dentro de la imagen, para que la API arranque ya con el modelo cargado.
+RUN python -m challenge.train
 
-# Run the API with uvicorn
-CMD ["uvicorn", "challenge.api:app", "--host", "0.0.0.0", "--port", "8080"]
+EXPOSE 8080
+CMD ["uvicorn", "challenge:app", "--host", "0.0.0.0", "--port", "8080"]

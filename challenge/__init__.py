@@ -1,3 +1,3 @@
-from challenge.api import app
+﻿from .api import app
 
-application = app
+__all__ = ["app"]

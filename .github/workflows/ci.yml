@@ -1,0 +1,25 @@
+﻿name: 'Continuous Integration'
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['main', 'develop']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: make install
+
+      - name: Tests del modelo (con cobertura)
+        run: make model-test
+
+      - name: Tests de la API (con cobertura)
+        run: make api-test

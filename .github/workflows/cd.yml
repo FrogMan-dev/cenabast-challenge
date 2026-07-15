@@ -1,0 +1,38 @@
+﻿name: 'Continuous Delivery'
+on:
+  push:
+    branches: ['main']
+
+env:
+  PROJECT_ID: prj-challenge-fs
+  REGION: us-central1
+  SERVICE_NAME: cenabast-challenge-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy a Cloud Run (build via Cloud Build, Artifact Registry automatico)
+        run: |
+          gcloud run deploy $SERVICE_NAME \
+            --source . \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --platform managed \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Mostrar URL del servicio
+        run: |
+          gcloud run services describe $SERVICE_NAME \
+            --region $REGION --project $PROJECT_ID \
+            --format='value(status.url)'
