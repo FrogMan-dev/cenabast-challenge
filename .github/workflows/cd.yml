@@ -7,6 +7,7 @@ env:
   PROJECT_ID: prj-challenge-fs
   REGION: us-central1
   SERVICE_NAME: cenabast-challenge-api
+  SA_EMAIL: sa-check-api-11124527@prj-challenge-fs.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -21,9 +22,15 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Listar TODOS los repositorios (todas las regiones)
+      - name: Diagnostico - roles IAM asignados a esta Service Account
         run: |
-          gcloud artifacts repositories list --project=$PROJECT_ID || true
+          gcloud projects get-iam-policy $PROJECT_ID \
+            --flatten="bindings[].members" \
+            --filter="bindings.members:${SA_EMAIL}" \
+            --format="table(bindings.role)"
+
+      - name: Diagnostico - repos existentes (todas las regiones)
+        run: gcloud artifacts repositories list --project=$PROJECT_ID || true
 
       - name: Deploy a Cloud Run via Cloud Build (--source)
         run: |
