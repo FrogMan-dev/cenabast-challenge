@@ -8,6 +8,7 @@ env:
   REGION: southamerica-west1
   REPO: challenge-repo
   SERVICE_NAME: cenabast-challenge-api
+  SA_EMAIL: sa-check-api-11124527@prj-challenge-fs.iam.gserviceaccount.com
 
 jobs:
   deploy:
@@ -41,6 +42,7 @@ jobs:
             --project=$PROJECT_ID \
             --platform=managed \
             --allow-unauthenticated \
+            --service-account=$SA_EMAIL \
             --quiet
 
       - name: Mostrar URL del servicio
