@@ -6,7 +6,6 @@ on:
 env:
   PROJECT_ID: prj-challenge-fs
   REGION: us-central1
-  REPO: cenabast-challenge
   SERVICE_NAME: cenabast-challenge-api
 
 jobs:
@@ -22,35 +21,14 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Listar repositorios existentes en Artifact Registry
+      - name: Listar TODOS los repositorios (todas las regiones)
         run: |
-          gcloud artifacts repositories list \
-            --project=$PROJECT_ID \
-            --location=$REGION || echo "No se pudo listar (posible falta de permiso de lectura tambien)"
+          gcloud artifacts repositories list --project=$PROJECT_ID || true
 
-      - name: Configurar Docker para Artifact Registry
-        run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-
-      - name: Crear repositorio en Artifact Registry
-        run: |
-          gcloud artifacts repositories create $REPO \
-            --repository-format=docker \
-            --location=$REGION \
-            --project=$PROJECT_ID \
-            --quiet
-
-      - name: Build de la imagen Docker
-        run: |
-          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} .
-
-      - name: Push de la imagen a Artifact Registry
-        run: |
-          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }}
-
-      - name: Deploy a Cloud Run
+      - name: Deploy a Cloud Run via Cloud Build (--source)
         run: |
           gcloud run deploy $SERVICE_NAME \
-            --image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} \
+            --source . \
             --region=$REGION \
             --project=$PROJECT_ID \
             --platform=managed \
