@@ -7,7 +7,7 @@ env:
   PROJECT_ID: prj-challenge-fs
   REGION: us-central1
   SERVICE_NAME: cenabast-challenge-api
-  SA_EMAIL: sa-check-api-11124527@prj-challenge-fs.iam.gserviceaccount.com
+  REPO: cenabast-challenge
 
 jobs:
   deploy:
@@ -22,17 +22,30 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Diagnostico - roles IAM asignados a esta Service Account
+      - name: Diagnostico 1 - repos en todas las regiones
+        continue-on-error: true
+        run: gcloud artifacts repositories list --project=$PROJECT_ID
+
+      - name: Diagnostico 2 - servicios/APIs habilitadas
+        continue-on-error: true
+        run: gcloud services list --project=$PROJECT_ID --enabled
+
+      - name: Diagnostico 3 - servicios Cloud Run existentes
+        continue-on-error: true
+        run: gcloud run services list --project=$PROJECT_ID --region=$REGION
+
+      - name: Configurar Docker para Artifact Registry
+        continue-on-error: true
+        run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+
+      - name: Intento A - build y push a repo propio (sin crear)
+        continue-on-error: true
         run: |
-          gcloud projects get-iam-policy $PROJECT_ID \
-            --flatten="bindings[].members" \
-            --filter="bindings.members:${SA_EMAIL}" \
-            --format="table(bindings.role)"
+          docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} .
+          docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }}
 
-      - name: Diagnostico - repos existentes (todas las regiones)
-        run: gcloud artifacts repositories list --project=$PROJECT_ID || true
-
-      - name: Deploy a Cloud Run via Cloud Build (--source)
+      - name: Intento B - deploy via Cloud Build (--source)
+        continue-on-error: true
         run: |
           gcloud run deploy $SERVICE_NAME \
             --source . \
@@ -42,7 +55,8 @@ jobs:
             --allow-unauthenticated \
             --quiet
 
-      - name: Mostrar URL del servicio
+      - name: Mostrar URL del servicio (si algo funciono)
+        continue-on-error: true
         run: |
           gcloud run services describe $SERVICE_NAME \
             --region $REGION --project $PROJECT_ID \
