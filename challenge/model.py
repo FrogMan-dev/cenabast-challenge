@@ -23,6 +23,7 @@ class ReplenishmentModel:
         self._feature_columns: List[str] = []
         self._history: dict = {}
         self._stock_history: dict = {}
+        self._gtin_encoder: dict = {}
         self._is_fitted = False
 
         if ARTIFACT_PATH.exists():
@@ -126,12 +127,32 @@ class ReplenishmentModel:
 
         return (features, target) if target is not None else features
 
+    def _encode_gtin_for_model(self, X: pd.DataFrame, fit_encoder: bool) -> pd.DataFrame:
+        """
+        HistGradientBoosting espera que las columnas categoricas contengan
+        codigos ordinales pequenos (< 255). Los GTIN son numeros de 13
+        digitos, muy por encima de ese limite, asi que se remapean aqui a
+        codigos 0..n-1 justo antes de entrenar/predecir. El resto del
+        sistema (historial, API, tests) sigue usando el GTIN real.
+        """
+        X = X.copy()
+        if fit_encoder:
+            unique_gtins = sorted(X["gtin"].unique())
+            self._gtin_encoder = {g: i for i, g in enumerate(unique_gtins)}
+
+        X["gtin"] = X["gtin"].map(self._gtin_encoder)
+        # gtin no visto en entrenamiento (edge case): cae en codigo 0 en vez
+        # de romper la prediccion.
+        X["gtin"] = X["gtin"].fillna(0).astype(int)
+        return X
+
     def fit(self, features: pd.DataFrame, target: pd.DataFrame) -> None:
         X = features.drop(columns=["fecha"])
         y = target.values.ravel()
 
+        X_encoded = self._encode_gtin_for_model(X, fit_encoder=True)
         self._feature_columns = list(X.columns)
-        cat_idx = [X.columns.get_loc("gtin")]
+        cat_idx = [X_encoded.columns.get_loc("gtin")]
 
         self._clf = HistGradientBoostingClassifier(
             categorical_features=cat_idx,
@@ -139,7 +160,7 @@ class ReplenishmentModel:
             max_iter=300,
             learning_rate=0.05,
         )
-        self._clf.fit(X, (y > 0).astype(int))
+        self._clf.fit(X_encoded, (y > 0).astype(int))
 
         mask_nz = y > 0
         self._reg = HistGradientBoostingRegressor(
@@ -155,7 +176,7 @@ class ReplenishmentModel:
             validation_fraction=0.15,
             n_iter_no_change=20,
         )
-        self._reg.fit(X[mask_nz], y[mask_nz])
+        self._reg.fit(X_encoded[mask_nz], y[mask_nz])
 
         self._model = self._reg
         self._is_fitted = True
@@ -186,8 +207,10 @@ class ReplenishmentModel:
             )
 
         X = features[self._feature_columns]
-        prob_venta = self._clf.predict_proba(X)[:, 1]
-        magnitud = np.clip(self._reg.predict(X), a_min=0, a_max=None)
+        X_encoded = self._encode_gtin_for_model(X, fit_encoder=False)
+
+        prob_venta = self._clf.predict_proba(X_encoded)[:, 1]
+        magnitud = np.clip(self._reg.predict(X_encoded), a_min=0, a_max=None)
         preds = np.where(prob_venta > DECISION_THRESHOLD, magnitud, 0.0)
 
         result = []
@@ -260,6 +283,7 @@ class ReplenishmentModel:
                 "feature_columns": self._feature_columns,
                 "history": self._history,
                 "stock_history": self._stock_history,
+                "gtin_encoder": self._gtin_encoder,
             }, f)
 
     def load(self, path: str) -> None:
@@ -271,4 +295,5 @@ class ReplenishmentModel:
         self._feature_columns = state["feature_columns"]
         self._history = state["history"]
         self._stock_history = state.get("stock_history", {})
+        self._gtin_encoder = state.get("gtin_encoder", {})
         self._is_fitted = True
