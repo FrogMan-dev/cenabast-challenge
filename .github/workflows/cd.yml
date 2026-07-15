@@ -5,9 +5,9 @@ on:
 
 env:
   PROJECT_ID: prj-challenge-fs
-  REGION: us-central1
+  REGION: southamerica-west1
+  REPO: challenge-repo
   SERVICE_NAME: cenabast-challenge-api
-  REPO: cenabast-challenge
 
 jobs:
   deploy:
@@ -22,41 +22,28 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Diagnostico 1 - repos en todas las regiones
-        continue-on-error: true
-        run: gcloud artifacts repositories list --project=$PROJECT_ID
-
-      - name: Diagnostico 2 - servicios/APIs habilitadas
-        continue-on-error: true
-        run: gcloud services list --project=$PROJECT_ID --enabled
-
-      - name: Diagnostico 3 - servicios Cloud Run existentes
-        continue-on-error: true
-        run: gcloud run services list --project=$PROJECT_ID --region=$REGION
-
       - name: Configurar Docker para Artifact Registry
-        continue-on-error: true
         run: gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
 
-      - name: Intento A - build y push a repo propio (sin crear)
-        continue-on-error: true
+      - name: Build de la imagen Docker
         run: |
           docker build -t $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} .
+
+      - name: Push de la imagen a Artifact Registry
+        run: |
           docker push $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }}
 
-      - name: Intento B - deploy via Cloud Build (--source)
-        continue-on-error: true
+      - name: Deploy a Cloud Run
         run: |
           gcloud run deploy $SERVICE_NAME \
-            --source . \
+            --image=$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/api:${{ github.sha }} \
             --region=$REGION \
             --project=$PROJECT_ID \
             --platform=managed \
             --allow-unauthenticated \
             --quiet
 
-      - name: Mostrar URL del servicio (si algo funciono)
-        continue-on-error: true
+      - name: Mostrar URL del servicio
         run: |
           gcloud run services describe $SERVICE_NAME \
             --region $REGION --project $PROJECT_ID \
