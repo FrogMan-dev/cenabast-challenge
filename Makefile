@@ -1,4 +1,4 @@
-.ONESHELL:
+﻿.ONESHELL:
 ENV_PREFIX=$(shell python -c "if __import__('pathlib').Path('.venv/bin/pip').exists(): print('.venv/bin/')")
 
 .PHONY: help
@@ -23,7 +23,7 @@ install:		## Install dependencies
 	pip install -r requirements-test.txt
 	pip install -r requirements.txt
 
-STRESS_URL = https://your-api-url.run.app
+STRESS_URL = https://cenabast-challenge-api-kdl2ntrxjq-tl.a.run.app
 .PHONY: stress-test
 stress-test:
 	# change stress url to your deployed app
